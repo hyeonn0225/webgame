@@ -7,7 +7,9 @@ class OnlineGame {
     if(!window.supabase)throw Error('연결 모듈을 불러오지 못했습니다. 새로고침해 주세요.');
     if(!host&&!/^[A-F0-9]{6}$/.test(code))throw Error('6자리 방 코드를 입력해 주세요.');
     this.host=host;this.code=host?Array.from(crypto.getRandomValues(new Uint8Array(3)),n=>n.toString(16).padStart(2,'0')).join('').toUpperCase():code;
-    this.client=window.supabase.createClient(config.url,config.key,{auth:{persistSession:false,autoRefreshToken:false}});
+    const clientKey=config.url+'|'+config.key;
+    window.__afterHoursClients=window.__afterHoursClients||{};
+    this.client=window.__afterHoursClients[clientKey]||(window.__afterHoursClients[clientKey]=window.supabase.createClient(config.url,config.key,{auth:{persistSession:false,autoRefreshToken:false,storageKey:'after-hours-auth'}}));
     this.channel=this.client.channel('after-hours:'+this.code,{config:{broadcast:{self:false}}});
     this.channel.on('broadcast',{event:'game'},({payload})=>this.receive(payload));
     await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('실시간 연결 시간이 초과되었습니다.')),12000);this.channel.subscribe(status=>{this.ready=status==='SUBSCRIBED';this.onStatus(this.ready);if(this.ready){clearTimeout(timeout);resolve();}else if(status==='CHANNEL_ERROR'){clearTimeout(timeout);reject(Error('Supabase 실시간 연결에 실패했습니다.'));}});});
