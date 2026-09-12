@@ -1,16 +1,18 @@
 # Vercel + Supabase 배포
 
-이 문서가 이전 README의 Node 서버 실행 안내를 대체합니다. Vercel은 정적 화면을 제공하고 Supabase Broadcast로 게임을 동기화합니다. 방장 브라우저가 전투를 계산합니다.
+기존 온라인 협동 버전을 2인 PvP 배틀로얄로 교체했다. 같은 Supabase 프로젝트와 환경 변수를 사용한다.
 
-1. Supabase 프로젝트를 만들고 Project URL과 Publishable key를 확인합니다. Realtime의 public 채널을 허용합니다. SQL과 테이블 생성은 필요 없습니다.
-2. Vercel에서 저장소를 Import하고 Framework를 Other로 선택합니다. vercel.json이 `npm run build`와 출력 폴더 `dist`를 지정합니다.
-3. 환경 변수 `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`를 추가합니다. legacy anon key는 `SUPABASE_ANON_KEY`로도 지원합니다. 공개 키만 사용하세요. service_role / secret 키는 사용하지 않습니다.
-4. Deploy 후 두 컴퓨터에서 같은 URL로 접속합니다. 방 만들기 → 6자리 코드 공유 → 친구 참가 → 방장이 시작합니다. 환경 변수 변경 후 Redeploy가 필요합니다.
+1. Supabase 프로젝트의 Project URL과 Publishable key를 준비한다. legacy anon key도 지원한다. Realtime public 채널을 허용한다. SQL이나 테이블 생성은 필요 없다.
+2. Vercel에 저장소를 연결하고 배포 대상 브랜치를 fe-design으로 지정한다. Framework는 Other. vercel.json에 빌드 명령 npm run build, 출력 폴더 dist가 지정되어 있다.
+3. 환경 변수 SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY를 추가한다. legacy 키는 SUPABASE_ANON_KEY 이름도 가능하다. 공개 키만 사용한다. secret / service_role 키는 사용하지 않는다.
+4. 배포 후 두 컴퓨터에서 같은 URL을 열고 방 코드로 참가한다. 환경 변수 변경 후 재배포해야 한다.
 
-각자 WASD 또는 방향키 이동, 자동 공격, 숫자 1~3으로 팀 강화 선택, P로 공동 일시정지. 쓰러진 친구 곁에서 3초 기다리면 구조합니다. 10분 생존 또는 보스 처치로 승리합니다.
+새 버전은 after-hours-br 채널을 사용하므로 구버전 생존 게임과 매치가 섞이지 않는다. 업데이트 후 두 사람 모두 페이지를 새로고침하고 새 방을 생성한다.
 
-방장이 탭을 열어두어야 합니다. 방장 탭이 숨겨지면 일시정지합니다. 잠깐의 연결 단절은 재연결 후 수동 재개합니다. 새로고침·탭 종료 후 진행 복구 및 방장 이전은 지원하지 않습니다. 새 방을 생성하세요. 공용 Broadcast 채널을 사용하는 친구용 프로토타입으로 인증·비공개 채널·치트 방지는 포함되지 않습니다.
+방장 브라우저가 계산하고 Supabase가 상태와 입력을 중계한다. 방장 탭이 숨겨지면 매치가 멈춘다. 잠깐의 연결 단절은 재연결 후 재개할 수 있지만, 새로고침·종료 후 진행 복구는 지원하지 않는다. 비공개 인증 채널 및 방장 치트 방지는 포함하지 않는다.
 
-로컬: Node.js 20 이상에서 환경 변수를 지정하고 `npm run build`, `npm start` 후 http://localhost:3000 접속. 환경 변수가 없어도 화면 빌드는 되며 방 생성 시 설정 안내를 표시합니다. `npm test`로 핵심 게임 규칙을 검증합니다. 실제 두 컴퓨터 연결은 Supabase 설정 후 별도 확인해야 합니다.
+로컬 실행: 환경 변수를 설정하고 npm run build, npm start 후 http://localhost:3000 접속. 설정이 없어도 UI 빌드는 가능하지만 온라인 방 생성은 불가능하다.
 
-공식 참고: https://supabase.com/docs/guides/realtime/broadcast
+규칙 테스트: npm test. 브라우저 통합 테스트: node browser-test.cjs (Playwright 필요, 로컬 중계). 실제 Supabase 연결과 배포 성공은 별도로 확인한다.
+
+참고: https://supabase.com/docs/guides/realtime/broadcast

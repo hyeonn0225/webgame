@@ -10,10 +10,10 @@ class OnlineGame {
     const clientKey=config.url+'|'+config.key;
     window.__afterHoursClients=window.__afterHoursClients||{};
     this.client=window.__afterHoursClients[clientKey]||(window.__afterHoursClients[clientKey]=window.supabase.createClient(config.url,config.key,{auth:{persistSession:false,autoRefreshToken:false,storageKey:'after-hours-auth'}}));
-    this.channel=this.client.channel('after-hours:'+this.code,{config:{broadcast:{self:false}}});
+    this.channel=this.client.channel('after-hours-br:'+this.code,{config:{broadcast:{self:false}}});
     this.channel.on('broadcast',{event:'game'},({payload})=>this.receive(payload));
     await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(Error('실시간 연결 시간이 초과되었습니다.')),12000);this.channel.subscribe(status=>{this.ready=status==='SUBSCRIBED';this.onStatus(this.ready);if(this.ready){clearTimeout(timeout);resolve();}else if(status==='CHANNEL_ERROR'){clearTimeout(timeout);reject(Error('Supabase 실시간 연결에 실패했습니다.'));}});});
-    if(host){this.room={code:this.code,players:[{slot:0,token:this.id,stream:true,inputAt:Date.now()}]};reset(this.room);}
+    if(host){this.room={code:this.code,players:[{slot:0,token:this.id,stream:true,inputAt:Date.now()}]};Battle.reset(this.room);}
     else{
       await new Promise((resolve,reject)=>{this.joinResolve=resolve;this.joinReject=reject;this.joinTimer=setInterval(()=>this.send({kind:'join',id:this.id}),500);this.joinTimeout=setTimeout(()=>{clearInterval(this.joinTimer);reject(Error('방을 찾지 못했습니다. 방 코드와 방장 접속을 확인해 주세요.'));},10000);this.send({kind:'join',id:this.id});});
     }
@@ -25,31 +25,27 @@ class OnlineGame {
     if(this.host){
       const r=this.room;if(!r)return;
       if(m.kind==='join'&&typeof m.id==='string'){
-        if(r.players.length===1){r.players.push({slot:1,token:m.id,stream:true,inputAt:Date.now()});reset(r);}
+        if(r.players.length===1){r.players.push({slot:1,token:m.id,stream:true,inputAt:Date.now()});Battle.reset(r);}
         const allowed=r.players[1]?.token===m.id;
         this.send({kind:'admit',to:m.id,host:this.id,ok:allowed});return;
       }
       const p=r.players.find(p=>p.token===m.id);if(!p)return;
       p.inputAt=Date.now();p.stream=true;
       if(m.kind==='input')p.keys=m.keys||{};
-      if(m.kind==='action')this.apply(m.path,m.data,p);
+      if(m.kind==='action'&&Number.isSafeInteger(m.actionId)&&m.actionId>(p.lastAction||0)){p.lastAction=m.actionId;this.apply(m.path,m.data,p);}
     }else{
       if(m.kind==='admit'&&m.to===this.id){clearInterval(this.joinTimer);clearTimeout(this.joinTimeout);if(m.ok){this.hostId=m.host;this.joinResolve?.();}else this.joinReject?.(Error('이미 두 명이 참가한 방입니다.'));}
-      if(m.kind==='state'&&m.host===this.hostId&&m.seq>this.remoteSeq){this.remoteSeq=m.seq;this.lastState=Date.now();this.latest=m.state;this.onState(m.state);}
+      if(m.kind==='state'&&m.to===this.id&&m.host===this.hostId&&m.seq>this.remoteSeq){this.remoteSeq=m.seq;this.lastState=Date.now();this.latest=m.state;this.onState(m.state);}
     }
   }
-  apply(path,data,p){const r=this.room;
-    if(path==='/start'&&p.slot===0&&r.players.length===2&&r.players.every(p=>p.stream)&&['waiting','won','lost'].includes(r.state)){reset(r);r.state='playing';for(let i=0;i<6;i++)spawn(r);}
-    if(path==='/pause'){if(r.state==='playing')r.state='paused';else if(['paused','disconnected'].includes(r.state)&&r.players.every(p=>p.stream))r.state='playing';}
-    if(path==='/choose'&&data.level===r.level)choose(r,data.choice);
-  }
+  apply(path,data,p){Battle.action(this.room,p,path,data||{});}
   input(keys){if(this.host){const p=this.room.players[0];p.keys=keys;p.inputAt=Date.now();}else this.send({kind:'input',id:this.id,keys});}
-  action(path,data={}){if(this.host)this.apply(path,data,this.room.players[0]);else this.send({kind:'action',id:this.id,path,data});}
+  action(path,data={}){if(this.host)this.apply(path,data,this.room.players[0]);else this.send({kind:'action',id:this.id,path,data,actionId:this.actionId=(this.actionId||0)+1});}
   tick(){
     if(this.host){const r=this.room;r.players[0].stream=this.ready;for(const p of r.players.slice(1))p.stream=this.ready&&Date.now()-p.inputAt<3000;
-      if(document.hidden&&r.state==='playing')r.state='paused';
-      update(r,1/30);this.onState(snapshot(r));if(++this.seq%3===0)this.send({kind:'state',host:this.id,seq:this.seq,state:snapshot(r)});
+      if(document.hidden&&['playing','selecting','dropping'].includes(r.state)){r.resume=r.state;r.state='paused';}
+      Battle.update(r,1/30);this.onState(Battle.snapshot(r,0));if(++this.seq%2===0&&r.players[1])this.send({kind:'state',host:this.id,to:r.players[1].token,seq:this.seq,state:Battle.snapshot(r,1)});
     }else if(this.latest&&Date.now()-this.lastState>3000){this.onState({...this.latest,state:'disconnected'});}
   }
-  close(){clearInterval(this.timer);clearInterval(this.joinTimer);clearTimeout(this.joinTimeout);if(this.client)this.client.removeAllChannels();}
+  async close(){clearInterval(this.timer);clearInterval(this.joinTimer);clearTimeout(this.joinTimeout);this.ready=false;if(this.client&&this.channel)await this.client.removeChannel(this.channel);}
 }

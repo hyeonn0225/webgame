@@ -1,3 +1,3 @@
 const http=require('node:http'),fs=require('node:fs');
-const files={'/':'index.html','/engine.js':'engine.js','/network.js':'network.js','/config.js':'config.js'};
+const files={'/':'index.html','/battle.js':'battle.js','/game.js':'game.js','/motion.js':'motion.js','/network.js':'network.js','/config.js':'config.js'};
 http.createServer((req,res)=>{const file=files[req.url];if(!file){res.writeHead(404);return res.end();}const path=__dirname+'/dist/'+file;if(!fs.existsSync(path)){res.writeHead(503);return res.end('Run npm run build first.');}res.setHeader('Content-Type',file.endsWith('.html')?'text/html; charset=utf-8':'application/javascript');fs.createReadStream(path).pipe(res);}).listen(process.env.PORT||3000,()=>console.log('http://localhost:3000'));
